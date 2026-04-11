@@ -47,8 +47,6 @@ struct histogram {
 void worker(std::atomic<int>& counter, int sample_count, histogram& h, int gen_range) 
 {
     generator gen(gen_range);
-
-    static const int prime_bin[10] = {0, 0, 1, 1, 0, 1, 0, 1, 0, 0};
     const int CHUNK = 10000;
 
     for (;;) {
@@ -56,12 +54,11 @@ void worker(std::atomic<int>& counter, int sample_count, histogram& h, int gen_r
         if (start >= sample_count) break;
 
         int end = std::min(start + CHUNK, sample_count);
-
         int local_counts[2] = {0, 0};
 
         for (int i = start; i < end; ++i) {
             int value = gen();
-            int bin = prime_bin[value];
+            int bin = is_prime(value) ? 1 : 0;
             local_counts[bin]++;
         }
 
