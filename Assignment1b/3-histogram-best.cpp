@@ -8,12 +8,9 @@
 
 using namespace std;
 
-// Убираем padding - он не нужен для локальных гистограмм
-// и только увеличивает объем копируемых данных
+
 struct histogram {
     int data[10]{0};
-    // char padding[128]; // УДАЛЯЕМ - это замедляет копирование
-
     void print_total(std::ostream& str) const {
         int total = 0;
         for (int i = 0; i < 10; ++i) total += data[i];
@@ -27,13 +24,13 @@ struct histogram {
     }
 };
 
-// Добавляем inline для уменьшения overhead вызова
+
 inline histogram worker(int sample_count)
 {
     histogram local;
     generator gen(10);
 
-    // Увеличиваем развертывание цикла до 8 для уменьшения количества итераций
+    
     int n8 = sample_count / 8;
     int rem = sample_count % 8;
 
@@ -77,17 +74,15 @@ int main(int argc, char **argv)
     const int base = sample_count / num_threads;
     const int rem  = sample_count % num_threads;
 
-    // Оптимизация: создаем futures сразу с правильным количеством
+    
     for (int t = 0; t < num_threads; ++t) {
         const int local_count = base + (t < rem ? 1 : 0);
         futures.push_back(std::async(std::launch::async, worker, local_count));
     }
 
-    // Оптимизация: используем move семантику для избежания копирования
     for (auto& f : futures) {
-        histogram local = f.get();  // Получаем результат
+        histogram local = f.get();  
         
-        // Ручное развертывание цикла для быстрого сложения
         h.data[0] += local.data[0];
         h.data[1] += local.data[1];
         h.data[2] += local.data[2];

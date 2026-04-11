@@ -14,6 +14,14 @@ private:
     std::uniform_int_distribution<int> dist;
 };
 
+bool is_prime(int n) {
+    if (n < 2) return false;
+    for (int d = 2; d * d <= n; ++d) {
+        if (n % d == 0) return false;
+    }
+    return true;
+}
+
 // Parsing arguments
 void parse_args(int argc, char **argv, int& num_threads, int &num_bins, int &sample_size, int& print_level) {
     std::string usage("Usage: --num-threads <integer> --num-bins <integer> --samlpe-size <integer> --print-level <integer>");

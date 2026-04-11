@@ -11,8 +11,7 @@
 
 using namespace std;
 
-// Простая структура без лишних сложностей
-// alignas(64) гарантирует, что объекты Bucket будут на разных кэш-линиях
+
 struct alignas(64) Bucket {
     int count;
     std::mutex mtx;

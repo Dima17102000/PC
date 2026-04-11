@@ -11,7 +11,7 @@
 
 using namespace std;
 
-// Каждый атомарный бакет на отдельной кэш-линии
+
 struct alignas(64) AtomicBucket {
     std::atomic<int> count;
     char padding[64 - sizeof(std::atomic<int>)];
@@ -58,7 +58,6 @@ struct histogram {
 void worker(int sample_count, histogram& h, int num_bins) {
     generator gen(num_bins);
     
-    // Локальные счетчики для batch updates
     int local_counts[10] = {0};
     const int BATCH_SIZE = 1000;
     
@@ -70,7 +69,7 @@ void worker(int sample_count, histogram& h, int num_bins) {
             local_counts[next]++;
         }
         
-        // Batch update - в 1000 раз меньше атомарных операций
+        
         for (int bin = 0; bin < num_bins; ++bin) {
             if (local_counts[bin] > 0) {
                 h.add_batch(bin, local_counts[bin]);
