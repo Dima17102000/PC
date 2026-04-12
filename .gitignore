@@ -1,3 +1,5 @@
 .DS_Store
 Assignment1b/histogram
+Assignment1b/histogram-mutex
 Assignment1b/histogram-atomic
+Assignment1b/histogram-best
