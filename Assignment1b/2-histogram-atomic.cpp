@@ -6,30 +6,10 @@
 #include <thread>
 #include <atomic>
 #include <cstring>
-
+#include <algorithm>
 #include "helper.hpp"
 
 using namespace std;
-
-const int MAX_RANDOM = 1000000;
-static vector<bool> prime_table;
-
-void build_prime_table(int limit) {
-    prime_table.assign(limit, true);
-    if (limit > 0) prime_table[0] = false;
-    if (limit > 1) prime_table[1] = false;
-    for (int i = 2; i * i < limit; ++i) {
-        if (prime_table[i]) {
-            for (int j = i * i; j < limit; j += i)
-                prime_table[j] = false;
-        }
-    }
-}
-
-inline bool is_prime_fast(int n) {
-    return n >= 0 && n < (int)prime_table.size() && prime_table[n];
-}
-
 
 struct alignas(64) AtomicBucket {
     std::atomic<int> count;
@@ -74,34 +54,23 @@ struct histogram {
     }
 };
 
-void worker(int total_samples, histogram& h, std::atomic<int>& next_index, int max_random) {
-  
-    generator gen(max_random);
-    
-    
+void worker(std::atomic<int>& counter, int sample_count, histogram& h, int gen_range) {
+    generator gen(gen_range);
+    const int CHUNK = 1'000'000;
     int local_counts[2] = {0, 0};
-    const int BATCH_SIZE = 20000;   
     
-    while (true) {
-       
-        int start = next_index.fetch_add(BATCH_SIZE, std::memory_order_relaxed);
-        if (start >= total_samples) break;
-        int end = min(start + BATCH_SIZE, total_samples);
-        
-        
+    for (;;) {
+        int start = counter.fetch_add(CHUNK, std::memory_order_relaxed);
+        if (start >= sample_count) break;
+        int end = std::min(start + CHUNK, sample_count);
         for (int i = start; i < end; ++i) {
-            int val = gen();                
-            int bin = is_prime_fast(val) ? 0 : 1;
-            local_counts[bin]++;
+            int value = gen();
+            int bin = is_prime(value) ? 1 : 0;
+            ++local_counts[bin];
         }
-        
-        
-        for (int bin = 0; bin < 2; ++bin) {
-            if (local_counts[bin] > 0) {
-                h.add_batch(bin, local_counts[bin]);
-                local_counts[bin] = 0;
-            }
-        }
+        if (local_counts[0]) h.bins[0].add(local_counts[0]);
+        if (local_counts[1]) h.bins[1].add(local_counts[1]);
+        local_counts[0] = local_counts[1] = 0;
     }
 }
 
@@ -111,23 +80,19 @@ int main(int argc, char **argv) {
     int num_threads = std::thread::hardware_concurrency();
     if (num_threads <= 0) num_threads = 1;
     int print_level = 3;
-
-    const int MAX_RANDOM = 1000000;
-    parse_args(argc, argv, num_threads, num_bins, sample_count, print_level);
     
-    num_bins = 2;  
+    parse_args(argc, argv, num_threads, num_bins, sample_count, print_level);
+    num_bins = 2; // принудительно два бина
     
     histogram h(num_bins);
-    std::atomic<int> next_index(0);
+    std::atomic<int> counter{0};
     std::vector<std::thread> threads;
     threads.reserve(num_threads);
     
-
     auto t1 = chrono::high_resolution_clock::now();
     
-    
     for (int i = 0; i < num_threads; ++i) {
-        threads.emplace_back(worker, sample_count, std::ref(h), std::ref(next_index), MAX_RANDOM);
+        threads.emplace_back(worker, std::ref(counter), sample_count, std::ref(h), 10);
     }
     
     for (auto& th : threads) {
@@ -141,5 +106,3 @@ int main(int argc, char **argv) {
     if (print_level >= 1) h.print_total(cout);
     if (print_level >= 2 || print_level == -1) cout << chrono::duration<double>(t2 - t1).count() << endl;
 }
-
-
