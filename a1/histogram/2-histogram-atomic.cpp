@@ -11,7 +11,6 @@
 
 using namespace std;
 
-
 struct alignas(64) AtomicBucket {
     std::atomic<int> count;
     char padding[64 - sizeof(std::atomic<int>)];

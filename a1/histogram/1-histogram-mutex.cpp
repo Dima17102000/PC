@@ -6,7 +6,6 @@
 #include <thread>
 #include <mutex>
 #include <cstring>
-
 #include "helper.hpp"
 
 using namespace std;
@@ -80,6 +79,8 @@ void worker(int sample_count, histogram& h, int num_bins) {
         processed = batch_end;
     }
 }
+
+
 
 int main(int argc, char **argv) {
     int num_bins = 10;
