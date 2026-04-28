@@ -36,15 +36,22 @@ struct histogram {
 	~histogram() {free(data); }
 
 	void populate(int sample_size) {
-		// initialize random number generator
-		generator number_generator(bins);
+		int *hist_data = data;
+		int num_bins = bins;
 
-		for (int i = 0; i < sample_size; i++) {
-			// generate random number
-			int random_number = number_generator();
+		#pragma omp parallel default(none) shared(sample_size, hist_data, num_bins)
+		{
+			generator number_generator(num_bins);
 
-			// update corresponding bin
-			data[random_number]++;
+			#pragma omp for
+			for (int i = 0; i < sample_size; i++) {
+				int random_number = number_generator();
+
+				#pragma omp critical
+				{
+					hist_data[random_number]++;
+				}
+			}
 		}
 	}
 
