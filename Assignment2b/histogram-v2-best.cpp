@@ -2,85 +2,107 @@
 #include <iostream>
 #include <chrono>
 #include <random>
-
-struct generator {
+#include <omp.h>
+struct generator
+{
 private:
-	int bins;
+    int bins;
 
 public:
-    generator(const int& max) : bins(max) {	}
-    int operator()(int n) {
-		int num_factors = 0;
+    generator(const int &max) : bins(max) {}
+    int operator()(int n)
+    {
+        int num_factors = 0;
 
-		// Start with 2 and increment by 1 to check each number
-		for (int p = 2; p <= n; ++p) {
-			// While i divides n, print i and divide n
-			while (n % p == 0) {
-				n = n / p;
-				num_factors++;
-			}
-		}
-		return (num_factors < bins - 1) ? num_factors : bins - 1;
-	}
+        // Start with 2 and increment by 1 to check each number
+        for (int p = 2; p <= n; ++p)
+        {
+            // While i divides n, print i and divide n
+            while (n % p == 0)
+            {
+                n = n / p;
+                num_factors++;
+            }
+        }
+        return (num_factors < bins - 1) ? num_factors : bins - 1;
+    }
 };
 
-struct histogram {
-	int bins, *data;
+struct histogram
+{
+    int bins, *data;
 
-	histogram(int count) : bins(count) {
-		// allocate memory for histogram
-		data = (int*) malloc(sizeof(int) * count);
+    histogram(int count) : bins(count)
+    {
+        // allocate memory for histogram
+        data = (int *)malloc(sizeof(int) * count);
 
-		// initialize histogram with 0's
-		for (int b = 0; b < count; b++) {
-			data[b] = 0;
-		}
-	}
+        // initialize histogram with 0's
+        for (int b = 0; b < count; b++)
+        {
+            data[b] = 0;
+        }
+    }
 
-	~histogram() {free(data); }
+    ~histogram() { free(data); }
 
-	void populate(int sample_size) {
-		// initialize prime factors generator
-		generator number_generator(bins);
+    void populate(int sample_size)
+    {
+        int max_threads = omp_get_max_threads();
+        std::vector<std::vector<int>> partial_data(max_threads, std::vector<int>(bins, 0));
+#pragma omp parallel
+        {
 
-		for (int i = 2; i < sample_size; i++) {
-			// count number of prime factors for integer i
-			int number_of_primes = number_generator(i);
+            int tid = omp_get_thread_num();
+            generator number_generator(bins);
+#pragma omp for nowait schedule(dynamic, 50)
+            for (int i = 2; i < sample_size; i++)
+            {
+                // count number of prime factors for integer i
+                int number_of_primes = number_generator(i);
+                partial_data[tid][number_of_primes]++;
+            }
+        }
+        for (int i = 0; i < max_threads; i++)
+        {
+            for (int j = 0; j < bins; j++)
+            {
+                data[j] += partial_data[i][j];
+            }
+        }
+    }
 
-			// update corresponding bin
-			data[number_of_primes]++;
-		}
-	}
-
-	void print() {
-		int total = 0;
-		for (int b = 0; b < bins; ++b) {
-			total += data[b];
-			std::cout << b << ":" << data[b] << std::endl;
-		}
-		std::cout << "total: " << total << std::endl;
-	}
+    void print()
+    {
+        int total = 0;
+        for (int b = 0; b < bins; ++b)
+        {
+            total += data[b];
+            std::cout << b << ":" << data[b] << std::endl;
+        }
+        std::cout << "total: " << total << std::endl;
+    }
 };
 
 int main(int argc, char **argv)
 {
-	int num_bins = 10;
-	int sample_ceiling = 50000;
-	
-	std::cout << "Bins: " << num_bins << ", sample ceiling: " << sample_ceiling  << std::endl;
+    int num_bins = 10;
+    int sample_ceiling = 50000;
 
-	// initialize and empty histogram with 'num_bins' bins
-	histogram h(num_bins);
+    std::cout << "Bins: " << num_bins << ", sample ceiling: " << sample_ceiling << std::endl;
 
-	auto t1 = std::chrono::high_resolution_clock::now();
+    // initialize and empty histogram with 'num_bins' bins
+    histogram h(num_bins);
 
-	// populate the histogram that was just created
-	h.populate(sample_ceiling);
+    auto t1 = std::chrono::high_resolution_clock::now();
 
-	auto t2 = std::chrono::high_resolution_clock::now();
+    // populate the histogram that was just created
+    h.populate(sample_ceiling);
 
-	// print the contents of the histogram and the time it took populate it
-	h.print();
+    auto t2 = std::chrono::high_resolution_clock::now();
 
-	std::cout << "\ntime elapsed: " << std::chrono::duration<double>(t2 - t1).count() << " seconds." << std::endl;
+    // print the contents of the histogram and the time it took populate it
+    h.print();
+
+    std::cout << "\ntime elapsed: " << std::chrono::duration<double>(t2 - t1).count() << " seconds." << std::endl;
 }
