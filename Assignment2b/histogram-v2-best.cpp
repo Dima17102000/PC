@@ -20,8 +20,8 @@ public:
             // While i divides n, print i and divide n
             while (n % p == 0)
             {
-                n = n / p;
-                num_factors++;
+                n /= p;
+                ++num_factors;
             }
         }
         return (num_factors < bins - 1) ? num_factors : bins - 1;
@@ -46,29 +46,34 @@ struct histogram
 
     ~histogram() { free(data); }
 
+    //     void populate(int sample_size)
+    //     {
+    // #pragma omp parallel
+    //         {
+    //             generator number_generator(bins);
+    //             std::vector<int> local_data(bins, 0);
+    // #pragma omp for nowait schedule(dynamic)
+    //             for (int i = 2; i < sample_size; i++)
+    //             {
+    //                 int number_of_primes = number_generator(i);
+    //                 local_data[number_of_primes]++;
+    //             }
+    // #pragma omp critical
+    //             for (int j = 0; j < bins; j++)
+    //             {
+    //                 data[j] += local_data[j];
+    //             }
+    //         }
+    //     }
     void populate(int sample_size)
     {
-        int max_threads = omp_get_max_threads();
-        std::vector<std::vector<int>> partial_data(max_threads, std::vector<int>(bins, 0));
-#pragma omp parallel
-        {
+        generator number_generator(bins);
 
-            int tid = omp_get_thread_num();
-            generator number_generator(bins);
-#pragma omp for nowait schedule(dynamic, 50)
-            for (int i = 2; i < sample_size; i++)
-            {
-                // count number of prime factors for integer i
-                int number_of_primes = number_generator(i);
-                partial_data[tid][number_of_primes]++;
-            }
-        }
-        for (int i = 0; i < max_threads; i++)
+#pragma omp parallel for schedule(dynamic) firstprivate(number_generator) reduction(+ : data[ : bins])
+        for (int i = 2; i < sample_size; ++i)
         {
-            for (int j = 0; j < bins; j++)
-            {
-                data[j] += partial_data[i][j];
-            }
+            int number_of_primes = number_generator(i);
+            ++data[number_of_primes];
         }
     }
 
